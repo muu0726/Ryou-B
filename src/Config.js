@@ -43,7 +43,7 @@ export const CONFIG = {
     },
 
     // Touch
-    TOUCH_OFFSET_Y: -30, // Offset to show block above finger (reduced for easier bottom row placement)
+    TOUCH_OFFSET_Y: -100, // 指の上に大きく表示（ブロックブラスト風の距離感）
 
     // Game
     BLOCKS_PER_SET: 3,
