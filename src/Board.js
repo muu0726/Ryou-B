@@ -71,6 +71,59 @@ export class Board {
     }
 
     /**
+     * 配置シミュレーション: 消えるラインの予測
+     * @param {Array<{x: number, y: number}>} cells
+     * @param {number} baseX
+     * @param {number} baseY
+     * @returns {{rows: number[], cols: number[]}}
+     */
+    getClearingLines(cells, baseX, baseY) {
+        // 仮のボードを作成して配置
+        // クローンコストを避けるため、ビット演算で直接計算しても良いが
+        // ここでは安全のためクローンを使用
+        const testBoard = this.state;
+        let tempState = testBoard;
+
+        // 配置
+        for (const cell of cells) {
+            const x = baseX + cell.x;
+            const y = baseY + cell.y;
+            // 範囲外チェックは呼び出し元で行われている前提だが念のため
+            if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
+                const bit = 1n << BigInt(y * this.gridSize + x);
+                tempState |= bit;
+            }
+        }
+
+        const clearedRows = [];
+        const clearedCols = [];
+
+        // 行チェック
+        for (let y = 0; y < this.gridSize; y++) {
+            let rowMask = 0n;
+            for (let x = 0; x < this.gridSize; x++) {
+                rowMask |= 1n << BigInt(y * this.gridSize + x);
+            }
+            if ((tempState & rowMask) === rowMask) {
+                clearedRows.push(y);
+            }
+        }
+
+        // 列チェック
+        for (let x = 0; x < this.gridSize; x++) {
+            let colMask = 0n;
+            for (let y = 0; y < this.gridSize; y++) {
+                colMask |= 1n << BigInt(y * this.gridSize + x);
+            }
+            if ((tempState & colMask) === colMask) {
+                clearedCols.push(x);
+            }
+        }
+
+        return { rows: clearedRows, cols: clearedCols };
+    }
+
+    /**
      * 完成した行・列を検出して消去
      * @returns {{rows: number[], cols: number[], totalCleared: number}}
      */

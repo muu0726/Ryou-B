@@ -8,6 +8,12 @@ export const CONFIG = {
     CELL_SIZE: 40,
     GRID_GAP: 2,
 
+    // 難易度調整
+    DIFFICULTY: {
+        WAVE_CYCLE: 10, // 何手ごとに波を変えるか
+        ADAPTIVE_THRESHOLD: 0.7, // 盤面充填率70%で「ピンチ」と判定
+    },
+
     // Colors
     COLORS: {
         BACKGROUND: '#0a0a0a',
@@ -29,10 +35,11 @@ export const CONFIG = {
 
     // Scoring
     SCORE: {
-        BASE_POINTS: 10,
-        LINE_BONUS: [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600], // Index = lines cleared
-        COMBO_EXPONENT: 1.5,
-        PERFECT_BONUS: 3000,
+        BASE_POINTS: 1,       // 1セルあたりの配置点
+        LINE_BASE: 10,        // 1ライン消去の基礎点
+        MULTI_LINE_BONUS: 30, // 複数ライン消去時の1ラインあたりボーナス加算
+        COMBO_MULTIPLIER: 0.5, // コンボ倍率係数 (1 + combo * 0.5)
+        PERFECT_BONUS: 300,   // 全消しボーナス
     },
 
     // Touch

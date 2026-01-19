@@ -77,3 +77,15 @@ MIT License
 ## 🌐 GitHubリポジトリ
 
 [https://github.com/muu0726/Ryou-B](https://github.com/muu0726/Ryou-B)
+
+## 🌐 公開方法 (GitHub Pages)
+
+このゲームはGitHub Pagesを使って無料で公開できます。
+
+1. GitHubリポジトリの **Settings** (設定) タブを開く
+2. 左メニューから **Pages** を選択
+3. **Build and deployment** セクションで:
+    - Source: **Deploy from a branch**
+    - Branch: **main** / **root**
+4. **Save** をクリック
+5. 数分待つと、ページ上部に公開URLが表示されます（例: `https://muu0726.github.io/Ryou-B/`）

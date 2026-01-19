@@ -87,12 +87,18 @@ export class Renderer {
      * @param {import('./Board.js').Board} board 
      * @param {object|null} draggingBlock - {cells, color, gridX, gridY} or null
      * @param {object|null} ghostPosition - {x, y, valid} or null
+     * @param {object|null} clearingLines - {rows: number[], cols: number[]} or null
      */
-    draw(board, draggingBlock = null, ghostPosition = null) {
+    draw(board, draggingBlock = null, ghostPosition = null, clearingLines = null) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Layer 1: 背景（黒 + グリッド線）
         this.drawBackground();
+
+        // Layer 1.5: 予測ハイライト (消えるラインを光らせる)
+        if (clearingLines) {
+            this.drawPredictionHighlight(clearingLines);
+        }
 
         // Layer 2a: ゴースト表示
         if (ghostPosition && draggingBlock) {
@@ -106,6 +112,28 @@ export class Renderer {
 
         // Layer 3: 占有セルの写真断片（最前面）
         this.drawRevealedCells(board);
+    }
+
+    /**
+     * 予測ハイライト描画
+     * @param {{rows: number[], cols: number[]}} clearingLines 
+     */
+    drawPredictionHighlight(clearingLines) {
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; // 白く発光
+
+        // 行ハイライト
+        for (const y of clearingLines.rows) {
+            const pos = this.cellToPixel(0, y);
+            const width = this.gridSize * (this.cellSize + this.gridGap);
+            this.ctx.fillRect(pos.x - this.gridGap, pos.y, width, this.cellSize);
+        }
+
+        // 列ハイライト
+        for (const x of clearingLines.cols) {
+            const pos = this.cellToPixel(x, 0);
+            const height = this.gridSize * (this.cellSize + this.gridGap);
+            this.ctx.fillRect(pos.x, pos.y - this.gridGap, this.cellSize, height);
+        }
     }
 
     /**

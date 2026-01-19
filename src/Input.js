@@ -81,6 +81,9 @@ export class InputHandler {
 
     // === Touch Events ===
     _handleTouchStart(e) {
+        // キャンバス外（UIボタンなど）のタッチは阻害しない
+        if (e.target !== this.canvas) return;
+
         e.preventDefault();
         if (e.touches.length === 0) return;
 
@@ -89,14 +92,20 @@ export class InputHandler {
     }
 
     _handleTouchMove(e) {
+        // ドラッグ中のみスクロール等を防ぐ
+        if (!this.isDragging) return;
+
         e.preventDefault();
-        if (!this.isDragging || e.touches.length === 0) return;
+        if (e.touches.length === 0) return;
 
         const touch = e.touches[0];
         this._moveDrag(touch.clientX, touch.clientY);
     }
 
     _handleTouchEnd(e) {
+        // ドラッグ中のみ処理
+        if (!this.isDragging) return;
+
         e.preventDefault();
         this._endDrag();
     }

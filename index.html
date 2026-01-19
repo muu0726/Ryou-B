@@ -10,11 +10,11 @@
     <!-- Security: Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline';
-        style-src 'self' 'unsafe-inline';
+        script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.firebaseio.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com;
         img-src 'self' data: blob:;
-        connect-src 'self';
-        font-src 'self';
+        connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net;
         object-src 'none';
         base-uri 'self';
         form-action 'self';
@@ -38,6 +38,7 @@
             </div>
             <div class="header-buttons">
                 <button id="sound-btn" title="サウンド">🔊</button>
+                <button id="header-ranking-btn" title="ランキング">🏆</button>
                 <button id="retry-btn" title="リトライ">🔄</button>
             </div>
             <div class="score-display">
@@ -60,6 +61,26 @@
         </div>
     </div>
 
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-overlay" class="overlay hidden">
+        <div class="leaderboard-modal">
+            <div class="leaderboard-header">🏆 ランキング 🏆</div>
+            <div id="leaderboard-list" class="leaderboard-list">
+                <!-- Javascript will populate this -->
+                <div style="text-align:center; padding: 20px;">Loading...</div>
+            </div>
+
+            <div id="score-submit-area" class="leaderboard-input-area hidden">
+                <input type="text" id="player-name-input" class="player-name-input" placeholder="名前を入力" maxlength="10">
+                <button id="submit-score-btn" class="submit-score-btn">送信</button>
+            </div>
+            <div style="text-align: center; margin-bottom: 10px; font-size: 0.8rem; color: #888;" id="my-score-display">
+            </div>
+
+            <button id="close-leaderboard-btn" class="close-modal-btn">閉じる</button>
+        </div>
+    </div>
+
     <!-- Game Over Overlay -->
     <div id="game-over-overlay" class="overlay hidden">
         <div class="overlay-content">
@@ -67,7 +88,10 @@
             <p>SCORE: <span id="final-score">0</span></p>
             <p>BEST: <span id="final-high-score">0</span></p>
             <div class="overlay-buttons">
-                <button id="restart-btn">もう一度プレイ</button>
+                <div class="game-over-buttons">
+                    <button id="restart-btn" class="btn">もう一度</button>
+                    <button id="show-leaderboard-btn" class="btn secondary">ランキングに追加</button>
+                </div>
                 <button id="share-btn">📤 シェア</button>
             </div>
         </div>

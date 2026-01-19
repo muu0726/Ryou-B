@@ -8,6 +8,7 @@ import { BlockGenerator } from './BlockGenerator.js';
 import { Renderer } from './Renderer.js';
 import { InputHandler } from './Input.js';
 import { SoundManager } from './Sound.js';
+import { ScoreManager } from './ScoreManager.js';
 
 export class Game {
     /**
@@ -24,6 +25,7 @@ export class Game {
         this.blockGenerator = new BlockGenerator(this.board);
         this.input = new InputHandler(canvas, this.renderer);
         this.sound = new SoundManager();
+        this.scoreManager = new ScoreManager();
 
         // State
         this.score = 0;
@@ -74,6 +76,13 @@ export class Game {
             // ゴースト位置を更新
             const valid = this.board.canPlace(block.cells, gridPos.x, gridPos.y);
             this.ghostPosition = { x: gridPos.x, y: gridPos.y, valid };
+
+            // 予測ハイライト: ここで配置したら消えるラインを計算
+            let clearingLines = null;
+            if (valid) {
+                clearingLines = this.board.getClearingLines(block.cells, gridPos.x, gridPos.y);
+            }
+            this.clearingLines = clearingLines; // 状態として保持
 
             // ドラッグ中のスクリーン座標を更新
             this.draggingBlock.screenX = canvasX - (block.bounds.width * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
@@ -131,6 +140,130 @@ export class Game {
 
         // ハイスコア表示
         this.highScoreEl.textContent = this.highScore;
+
+        // ランキングUI
+        this._setupLeaderboardUI();
+    }
+
+    _setupLeaderboardUI() {
+        // 要素取得
+        this.leaderboardOverlay = document.getElementById('leaderboard-overlay');
+        this.leaderboardList = document.getElementById('leaderboard-list');
+        this.closeLeaderboardBtn = document.getElementById('close-leaderboard-btn');
+        this.showLeaderboardBtn = document.getElementById('show-leaderboard-btn');
+        this.submitScoreArea = document.getElementById('score-submit-area');
+        this.submitScoreBtn = document.getElementById('submit-score-btn');
+        this.playerNameInput = document.getElementById('player-name-input');
+        this.myScoreDisplay = document.getElementById('my-score-display');
+        this.headerRankingBtn = document.getElementById('header-ranking-btn');
+
+        // イベントリスナー
+        this.showLeaderboardBtn.addEventListener('click', () => {
+            // ゲームオーバー時は登録フォームを表示
+            const showInput = (this.gameState === 'gameover' && this.score > 0);
+            this.showLeaderboard(showInput);
+        });
+
+        // プレイ画面のランキングボタン（閲覧のみ）
+        if (this.headerRankingBtn) {
+            this.headerRankingBtn.addEventListener('click', () => {
+                this.showLeaderboard(false);
+            });
+        }
+
+        this.closeLeaderboardBtn.addEventListener('click', () => {
+            this.leaderboardOverlay.classList.add('hidden');
+        });
+
+        this.submitScoreBtn.addEventListener('click', () => {
+            this.submitScore();
+        });
+    }
+
+    async showLeaderboard(showSubmitInput = false) {
+        this.leaderboardOverlay.classList.remove('hidden');
+        this.leaderboardList.innerHTML = '<div style="text-align:center; padding: 20px;">Loading...</div>';
+
+        // 送信エリアの表示切替
+        if (showSubmitInput) {
+            this.submitScoreArea.classList.remove('hidden');
+            this.myScoreDisplay.textContent = `あなたのスコア: ${this.score}`;
+            // 保存された名前があれば入力済みにしておく
+            const savedName = localStorage.getItem('ryoutan-blast-username');
+            if (savedName) this.playerNameInput.value = savedName;
+        } else {
+            this.submitScoreArea.classList.add('hidden');
+            this.myScoreDisplay.textContent = '';
+        }
+
+        // データを取得して表示
+        const scores = await this.scoreManager.getLeaderboard(20);
+        this.renderLeaderboardList(scores);
+    }
+
+    renderLeaderboardList(scores) {
+        this.leaderboardList.innerHTML = '';
+
+        if (scores.length === 0) {
+            this.leaderboardList.innerHTML = '<div style="text-align:center; padding: 20px; color: #888;">No scores yet. Be the first!</div>';
+            return;
+        }
+
+        scores.forEach((entry, index) => {
+            const item = document.createElement('div');
+            item.className = 'leaderboard-item';
+
+            // 順位メダル
+            let rankStr = `${index + 1}`;
+            if (index === 0) rankStr = '🥇';
+            if (index === 1) rankStr = '🥈';
+            if (index === 2) rankStr = '🥉';
+
+            item.innerHTML = `
+                <div style="width: 30px; text-align: center;">${rankStr}</div>
+                <div style="flex: 1; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(entry.name)}</div>
+                <div style="width: 80px; text-align: right; font-family: monospace;">${entry.score.toLocaleString()}</div>
+            `;
+            this.leaderboardList.appendChild(item);
+        });
+    }
+
+    async submitScore() {
+        const name = this.playerNameInput.value.trim();
+        if (!name) return;
+
+        // 名前を保存
+        localStorage.setItem('ryoutan-blast-username', name);
+
+        // ボタンを無効化
+        this.submitScoreBtn.disabled = true;
+        this.submitScoreBtn.textContent = 'Sending...';
+
+        const result = await this.scoreManager.submitScore(name, this.score);
+
+        if (result.success) {
+            // 再読み込み
+            this.submitScoreBtn.textContent = 'Sent!';
+            setTimeout(() => {
+                this.submitScoreArea.classList.add('hidden');
+                this.submitScoreBtn.disabled = false;
+                this.submitScoreBtn.textContent = '送信';
+                this.showLeaderboard(false); // input無しで再表示（リスト更新）
+            }, 1000);
+        } else {
+            alert('Error: ' + result.error);
+            this.submitScoreBtn.disabled = false;
+            this.submitScoreBtn.textContent = '送信';
+        }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     /**
@@ -229,6 +362,7 @@ export class Game {
         this.draggingBlockIndex = -1;
         this.draggingBlock = null;
         this.ghostPosition = null;
+        this.clearingLines = null;
         this.input.setDragging(false);
         this.render();
     }
@@ -263,15 +397,32 @@ export class Game {
 
         if (linesCleared > 0) {
             this.combo++;
-            const lineBonus = CONFIG.SCORE.LINE_BONUS[Math.min(linesCleared, CONFIG.SCORE.LINE_BONUS.length - 1)];
-            const comboScore = Math.floor(lineBonus * Math.pow(this.combo, CONFIG.SCORE.COMBO_EXPONENT));
-            this.score += comboScore;
+
+            // ベース計算: (ライン数 * 基礎点) + (複数ラインボーナス * ライン数)
+            let baseLineScore = linesCleared * CONFIG.SCORE.LINE_BASE;
+
+            // マルチラインボーナス: 2列以上でボーナス加算
+            if (linesCleared > 1) {
+                baseLineScore += linesCleared * CONFIG.SCORE.MULTI_LINE_BONUS;
+            }
+
+            // コンボ倍率: 1 + (コンボ数 * 0.5) => 1.5, 2.0, 2.5...
+            const multiplier = 1 + (this.combo * CONFIG.SCORE.COMBO_MULTIPLIER);
+
+            const totalActionScore = Math.floor(baseLineScore * multiplier);
+            this.score += totalActionScore;
 
             // ライン消去エフェクト
             this.playLineClearEffect(clearResult.rows, clearResult.cols);
-            this.sound.playClear();
+
+            // ヒットストップ & シェイク演出 (2ライン以上 or 3コンボ以上で強く)
+            const magnitude = (linesCleared > 1 || this.combo > 2) ? 2 : 1;
+            this.triggerHitStop(magnitude);
+
+            this.sound.playClear(); // 音はSoundManager側でコンボによって変化させる想定
             this.showCombo(this.combo);
         } else {
+            // ラインが消えなかったらコンボリセット
             this.combo = 0;
         }
 
@@ -388,6 +539,13 @@ export class Game {
         this.finalScoreEl.textContent = this.score;
         this.finalHighScoreEl.textContent = this.highScore;
         this.gameOverOverlay.classList.remove('hidden');
+
+        // ランキング登録を促す (例えばハイスコア更新時や一定スコア以上)
+        if (this.score > 0) {
+            // 少し遅延させて「ランキングに登録しませんか？」感を出すことも可能
+            // 今回はボタンを押して登録するフローにするのでここでは何もしない
+            // ただし、ボタン自体はセットアップ済み
+        }
     }
 
     /**
@@ -439,7 +597,36 @@ export class Game {
      * 描画
      */
     render() {
-        this.renderer.draw(this.board, this.draggingBlock, this.ghostPosition);
+        // ヒットストップ中は描画更新をスキップ（静止効果）
+        if (this.isHitStopped) return;
+
+        this.renderer.draw(this.board, this.draggingBlock, this.ghostPosition, this.clearingLines);
+    }
+
+    /**
+     * ヒットストップ演出（衝撃で画面を止める）
+     * @param {number} magnitude 1:弱, 2:強
+     */
+    triggerHitStop(magnitude) {
+        // わずかな時間、描画をフリーズさせる
+        this.isHitStopped = true;
+        const duration = magnitude === 2 ? 100 : 40; // ms
+
+        // バイブレーション (Haptics)
+        if (navigator.vibrate) {
+            navigator.vibrate(magnitude === 2 ? 40 : 15);
+        }
+
+        // 画面シェイク (CSSクラス付与)
+        document.body.classList.remove('shake', 'shake-hard');
+        void document.body.offsetWidth; // リフロー
+        document.body.classList.add(magnitude === 2 ? 'shake-hard' : 'shake');
+
+        setTimeout(() => {
+            this.isHitStopped = false;
+            this.render(); // 再開時に1回描画
+            document.body.classList.remove('shake', 'shake-hard');
+        }, duration);
     }
 
     /**

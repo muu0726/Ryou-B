@@ -361,6 +361,124 @@ body.is-dragging .tray-block:not(.dragging):not(.used):not(.disabled) {
     }
 }
 
+@keyframes shakeHard {
+
+    10%,
+    90% {
+        transform: translate3d(-2px, 2px, 0) rotate(1deg);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(4px, -4px, 0) rotate(-1deg);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-8px, 6px, 0) rotate(2deg);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(8px, -6px, 0) rotate(-2deg);
+    }
+}
+
+/* ===== Leaderboard Modal ===== */
+.leaderboard-modal {
+    background: rgba(10, 10, 10, 0.95);
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 80vh;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.leaderboard-header {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: center;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.leaderboard-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.leaderboard-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+}
+
+.leaderboard-item:nth-child(1) {
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.leaderboard-item:nth-child(2) {
+    color: #c0c0c0;
+}
+
+.leaderboard-item:nth-child(3) {
+    color: #cd7f32;
+}
+
+.leaderboard-input-area {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.player-name-input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #222;
+    color: #fff;
+}
+
+.submit-score-btn {
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.submit-score-btn:hover {
+    background: #0069d9;
+}
+
+.close-modal-btn {
+    width: 100%;
+    padding: 10px;
+    background: #444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+.close-modal-btn:hover {
+    background: #555;
+}
+
 /* ===== Line Clear Flash ===== */
 @keyframes lineClearFlash {
     0% {

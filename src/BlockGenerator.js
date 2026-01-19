@@ -12,16 +12,54 @@ export class BlockGenerator {
     constructor(board) {
         this.board = board;
         this.currentScore = 0;
+        this.generationCount = 0; // 生成回数（難易度ウェーブ用）
     }
 
     /**
-     * スコアに応じた難易度レベルを取得
-     * @returns {'EASY' | 'MEDIUM' | 'HARD'}
+     * 現在の状態に基づいて難易度プールを決定（適応型難易度）
+     * @returns {string[]} 形状プール
      */
-    getDifficultyLevel() {
-        if (this.currentScore < 500) return 'EASY';
-        if (this.currentScore < 2000) return 'MEDIUM';
-        return 'HARD';
+    getAdaptivePool() {
+        const occupiedCount = this.board.countOccupied();
+        const fillRate = occupiedCount / (CONFIG.GRID_SIZE * CONFIG.GRID_SIZE);
+
+        // 1. ピンチ判定: 盤面が70%以上埋まっていたら、強制的にEASY（小さいブロック）を多くする
+        if (fillRate > CONFIG.DIFFICULTY.ADAPTIVE_THRESHOLD) {
+            // 80%の確率でEASY、20%でMEDIUM（救済措置）
+            return Math.random() < 0.8 ? SHAPE_POOLS.EASY : SHAPE_POOLS.MEDIUM;
+        }
+
+        // 2. 難易度ウェーブ: 一定周期で波を作る
+        // 例: 10回ごとにサイクル。前半は易しめ、後半は難しめ
+        const cyclePos = this.generationCount % CONFIG.DIFFICULTY.WAVE_CYCLE;
+        const isHardWave = cyclePos > (CONFIG.DIFFICULTY.WAVE_CYCLE / 2);
+
+        // 基本難易度はスコア依存
+        let baseLevel = 'EASY';
+        if (this.currentScore > 2000) baseLevel = 'HARD';
+        else if (this.currentScore > 500) baseLevel = 'MEDIUM';
+
+        // 難易度決定ロジック
+        if (baseLevel === 'EASY') {
+            // 序盤は基本EASY、たまにMEDIUM
+            return Math.random() < 0.9 ? SHAPE_POOLS.EASY : SHAPE_POOLS.MEDIUM;
+        } else if (baseLevel === 'MEDIUM') {
+            if (isHardWave) {
+                // 難しい波: MEDIUMメイン、たまにHARD
+                return Math.random() < 0.7 ? SHAPE_POOLS.MEDIUM : SHAPE_POOLS.HARD;
+            } else {
+                // 易しい波: EASYメイン、たまにMEDIUM
+                return Math.random() < 0.6 ? SHAPE_POOLS.EASY : SHAPE_POOLS.MEDIUM;
+            }
+        } else { // HARD
+            if (isHardWave) {
+                // 超難関: HARDメイン
+                return Math.random() < 0.8 ? SHAPE_POOLS.HARD : SHAPE_POOLS.MEDIUM;
+            } else {
+                // 休憩: MEDIUMメイン
+                return Math.random() < 0.7 ? SHAPE_POOLS.MEDIUM : SHAPE_POOLS.EASY;
+            }
+        }
     }
 
     /**
@@ -29,20 +67,7 @@ export class BlockGenerator {
      * @returns {string} 形状名
      */
     pickRandomShape() {
-        const level = this.getDifficultyLevel();
-        let pool;
-
-        // 難易度が上がると難しい形状も混ぜる
-        if (level === 'EASY') {
-            pool = SHAPE_POOLS.EASY;
-        } else if (level === 'MEDIUM') {
-            // EASY から 30%, MEDIUM から 70%
-            pool = Math.random() < 0.3 ? SHAPE_POOLS.EASY : SHAPE_POOLS.MEDIUM;
-        } else {
-            // MEDIUM から 40%, HARD から 60%
-            pool = Math.random() < 0.4 ? SHAPE_POOLS.MEDIUM : SHAPE_POOLS.HARD;
-        }
-
+        const pool = this.getAdaptivePool();
         const index = Math.floor(Math.random() * pool.length);
         return pool[index];
     }
@@ -76,6 +101,7 @@ export class BlockGenerator {
      * @returns {Array}
      */
     generateBlockSet() {
+        this.generationCount++;
         const occupiedCount = this.board.countOccupied();
 
         // パズルフェーズ: 残りが少ない時は逆算を試みる
@@ -99,8 +125,15 @@ export class BlockGenerator {
                 this.createBlock(this.pickRandomShape()),
             ];
 
-            // アイランド防止は厳しすぎる場合があるので、詰み防止のみ必須
+            // 全順列シミュレーションを行い、解がある場合のみ採用
             if (this.canPlaceAllInSomeOrder(blocks)) {
+
+                // 意地悪ロジック (高スコア時):
+                // もし「解が1通りしかない」かつ「今のスコアが高い」場合、そのまま採用（難易度UP）
+                // 逆に「解が多すぎる」場合は、簡単な波の時のみ採用するなど調整可能
+                // 現状は「とにかく解があればOK」とするが、
+                // 将来的にはここで「簡単すぎるセット」をリジェクトする判定も追加可能
+
                 return blocks;
             }
         }
@@ -165,7 +198,8 @@ export class BlockGenerator {
     }
 
     /**
-     * 3つのブロックが任意の順序で全て配置可能かチェック
+     * 3つのブロックが現在の盤面で配置可能かチェック（全順列シミュレーション）
+     * - A置いて消える -> 次にB置けるか？ を考慮
      * @param {Array} blocks 
      * @returns {boolean}
      */
@@ -173,7 +207,8 @@ export class BlockGenerator {
         const permutations = this.getPermutations([0, 1, 2]);
 
         for (const perm of permutations) {
-            if (this.canPlaceInOrder(blocks, perm)) {
+            // クローンしたボートでシミュレーション開始
+            if (this.simulatePlacementRecursive(this.board.clone(), blocks, perm, 0)) {
                 return true;
             }
         }
@@ -181,36 +216,43 @@ export class BlockGenerator {
     }
 
     /**
-     * 指定順序で配置可能かシミュレーション
-     * @param {Array} blocks 
-     * @param {number[]} order 
-     * @returns {boolean}
+     * 再帰的な配置シミュレーション
+     * @param {Board} currentBoard 現在のシミュレーションボード状態
+     * @param {Array} blocks ブロックリスト
+     * @param {number[]} order 配置順序インデックス
+     * @param {number} step 現在のステップ (0-2)
+     * @returns {boolean} 全て配置できればtrue
      */
-    canPlaceInOrder(blocks, order) {
-        const testBoard = this.board.clone();
+    simulatePlacementRecursive(currentBoard, blocks, order, step) {
+        // ベースケース: 全てのブロックを配置できた
+        if (step >= blocks.length) {
+            return true;
+        }
 
-        for (const idx of order) {
-            const cells = blocks[idx].cells;
-            let placed = false;
+        const blockIdx = order[step];
+        const block = blocks[blockIdx];
+        const cells = block.cells;
 
-            // 配置可能な場所を探す
-            outer:
-            for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
-                for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
-                    if (testBoard.canPlace(cells, x, y)) {
-                        testBoard.place(cells, x, y);
-                        testBoard.clearLines(); // ライン消去をシミュレート
-                        placed = true;
-                        break outer;
+        // 盤面上の全位置をスキャンして配置可能か試す
+        // 注意: 1箇所でも「置いて次に行ける」場所があればOK（深さ優先探索）
+        for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
+            for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
+                if (currentBoard.canPlace(cells, x, y)) {
+                    // 配置してライン消去まで行う
+                    const nextBoard = currentBoard.clone();
+                    nextBoard.place(cells, x, y);
+                    nextBoard.clearLines();
+
+                    // 次のステップへ
+                    if (this.simulatePlacementRecursive(nextBoard, blocks, order, step + 1)) {
+                        return true;
                     }
                 }
             }
-
-            if (!placed) {
-                return false;
-            }
         }
-        return true;
+
+        // どこにも置けない、あるいは置いても次が続かない
+        return false;
     }
 
     /**
