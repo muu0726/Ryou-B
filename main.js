@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     backgroundImage.onload = () => {
         console.log('[Main] Background image loaded.');
         const game = new Game(canvas, backgroundImage);
+        window.game = game; // Expose for testing
         console.log('[Main] Game initialized.');
     };
 

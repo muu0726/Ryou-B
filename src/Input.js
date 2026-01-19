@@ -138,11 +138,10 @@ export class InputHandler {
     }
 
     _moveDrag(clientX, clientY) {
-        // タッチオフセット適用
-        const offsetY = CONFIG.TOUCH_OFFSET_Y;
+        // Send RAW coordinates (Game.js handles the offset)
         this.currentScreenPos = {
             x: clientX,
-            y: clientY + offsetY,
+            y: clientY,
         };
 
         if (this.onDragMove) {

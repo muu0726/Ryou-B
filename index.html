@@ -37,9 +37,7 @@
                 <span id="score">0</span>
             </div>
             <div class="header-buttons">
-                <button id="sound-btn" title="サウンド">🔊</button>
-                <button id="header-ranking-btn" title="ランキング">🏆</button>
-                <button id="retry-btn" title="リトライ">🔄</button>
+                <button id="settings-btn" title="設定">⚙️</button>
             </div>
             <div class="score-display">
                 <span class="label">BEST</span>
@@ -58,6 +56,31 @@
         <div id="combo-display" class="hidden">
             <span id="combo-count">0</span>
             <span class="combo-label">COMBO</span>
+        </div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div id="settings-overlay" class="overlay hidden">
+        <div class="settings-modal">
+            <div class="settings-header">設定</div>
+            <div class="settings-list">
+                <button id="sound-btn" class="settings-item">
+                    <span class="icon">🔊</span>
+                    <span class="label">サウンド</span>
+                    <span class="status">ON</span>
+                </button>
+                <button id="header-ranking-btn" class="settings-item">
+                    <span class="icon">🏆</span>
+                    <span class="label">ランキング</span>
+                    <span class="arrow">▶</span>
+                </button>
+                <button id="retry-btn" class="settings-item">
+                    <span class="icon">🔄</span>
+                    <span class="label">リトライ</span>
+                    <span class="arrow">▶</span>
+                </button>
+            </div>
+            <button id="close-settings-btn" class="close-modal-btn">閉じる</button>
         </div>
     </div>
 

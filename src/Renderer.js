@@ -107,7 +107,7 @@ export class Renderer {
 
         // Layer 2b: ドラッグ中のブロック
         if (draggingBlock && draggingBlock.screenX !== undefined) {
-            this.drawDraggingBlock(draggingBlock);
+            this.drawDraggingBlock(draggingBlock, draggingBlock.scale || 1.0);
         }
 
         // Layer 3: 占有セルの写真断片（最前面）
@@ -196,15 +196,40 @@ export class Renderer {
     /**
      * ドラッグ中のブロックを描画（スクリーン座標で）
      * @param {object} block 
+     * @param {number} scale 拡大率
      */
-    drawDraggingBlock(block) {
+    drawDraggingBlock(block, scale = 1.0) {
         this.ctx.fillStyle = block.color;
         this.ctx.globalAlpha = 0.8;
 
+        const cellSize = this.cellSize;
+        const gap = this.gridGap;
+        const totalCellSize = cellSize + gap;
+
+        // Scaling center offset (approximate based on block center)
+        // Correct scaling requires adjusting the position relative to the block's center
+        // For simplicity, we scale each cell relative to the top-left of the block (screenX, screenY)
+        // or just scale the cell size.
+
+        // Let's just scale the cell size and gap
+        const scaledCellSize = cellSize * scale;
+        const scaledGap = gap * scale;
+        const scaledTotal = scaledCellSize + scaledGap;
+
+        // Adjustment to keep the block centered under the finger/offset
+        // If we scale up, the block grows down-right. We should shift it up-left by half the growth.
+        const width = block.bounds.width * totalCellSize - gap;
+        const height = block.bounds.height * totalCellSize - gap;
+        const scaledWidth = block.bounds.width * scaledTotal - scaledGap;
+        const scaledHeight = block.bounds.height * scaledTotal - scaledGap;
+
+        const offsetX = (width - scaledWidth) / 2;
+        const offsetY = (height - scaledHeight) / 2;
+
         for (const cell of block.cells) {
-            const px = block.screenX + cell.x * (this.cellSize + this.gridGap);
-            const py = block.screenY + cell.y * (this.cellSize + this.gridGap);
-            this.ctx.fillRect(px, py, this.cellSize, this.cellSize);
+            const px = block.screenX + offsetX + cell.x * scaledTotal;
+            const py = block.screenY + offsetY + cell.y * scaledTotal;
+            this.ctx.fillRect(px, py, scaledCellSize, scaledCellSize);
         }
 
         this.ctx.globalAlpha = 1.0;

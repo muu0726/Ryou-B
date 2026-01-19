@@ -127,19 +127,41 @@ export class BlockGenerator {
 
             // 全順列シミュレーションを行い、解がある場合のみ採用
             if (this.canPlaceAllInSomeOrder(blocks)) {
-
-                // 意地悪ロジック (高スコア時):
-                // もし「解が1通りしかない」かつ「今のスコアが高い」場合、そのまま採用（難易度UP）
-                // 逆に「解が多すぎる」場合は、簡単な波の時のみ採用するなど調整可能
-                // 現状は「とにかく解があればOK」とするが、
-                // 将来的にはここで「簡単すぎるセット」をリジェクトする判定も追加可能
-
                 return blocks;
             }
         }
 
+        // フォールバック: 通常ブロックでは配置不可能
+        console.warn('[BlockGenerator] Failed to generate standard blocks. Trying fallback with small blocks.');
+
+        // 最小ブロック (1x1) を定義
+        // Shapes.js で DOT が無効化されている場合はここで動的に生成
+        const DOT_SHAPE = [{ x: 0, y: 0 }];
+        const createDotBlock = () => {
+            return {
+                name: 'DOT',
+                cells: DOT_SHAPE,
+                color: CONFIG.COLORS.BLOCK_COLORS[Math.floor(Math.random() * CONFIG.COLORS.BLOCK_COLORS.length)],
+                bounds: { width: 1, height: 1 },
+                used: false,
+            };
+        };
+
+        // 救済措置: 極小ブロック3つ生成
+        // これでも置けなければ本当のゲームオーバー
+        const fallbackBlocks = [
+            createDotBlock(),
+            createDotBlock(),
+            createDotBlock()
+        ];
+
+        if (this.canPlaceAllInSomeOrder(fallbackBlocks)) {
+            console.log('[BlockGenerator] Fallback successful: Generated DOT blocks.');
+            return fallbackBlocks;
+        }
+
         // 配置可能なブロックが生成できない場合はnullを返す（ゲームオーバー処理を呼び出し側で）
-        console.warn('[BlockGenerator] Cannot generate placeable blocks - game should end');
+        console.warn('[BlockGenerator] Cannot generate even DOT blocks - GAME OVER');
         return null;
     }
 

@@ -49,24 +49,33 @@ export class ScoreManager {
         }
     }
 
-    /**
-     * スコアを送信
-     * @param {string} name プレイヤー名
-     * @param {number} score スコア
-     */
     async submitScore(name, score) {
         if (!this.isInitialized) return { success: false, error: 'Not initialized' };
 
         try {
-            await addDoc(collection(this.db, this.collectionName), {
+            // ユーザーIDをローカルストレージから取得または生成
+            let userId = localStorage.getItem('ryoutan-blast-uid');
+            if (!userId) {
+                userId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('ryoutan-blast-uid', userId);
+            }
+
+            // setDoc を使用して特定のID（ユーザーID）のドキュメントを更新/作成
+            // これにより、同一ユーザーが何度もランキングを埋め尽くすのを防ぐ
+            const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            const docRef = doc(this.db, this.collectionName, userId);
+
+            await setDoc(docRef, {
                 name: name,
-                score: score,
+                score: Number(score), // 明示的に数値型に変換
                 timestamp: serverTimestamp(),
-                userAgent: navigator.userAgent // 簡易的な不正チェック用
+                userId: userId, // クエリ用
+                userAgent: navigator.userAgent
             });
+
             return { success: true };
         } catch (e) {
-            console.error('Error adding score: ', e);
+            console.error('Error adding/updating score: ', e);
             return { success: false, error: e.message };
         }
     }

@@ -37,6 +37,15 @@ export class Game {
         this.ghostPosition = null;
         this.gameState = 'playing'; // 'playing', 'gameover'
 
+        this.dragState = {
+            isActive: false,
+            startTime: 0,
+            pointerX: 0,
+            pointerY: 0,
+            currentScale: 1.0,
+            currentOffsetY: 0
+        };
+
         // UI Elements
         this.scoreEl = document.getElementById('score');
         this.highScoreEl = document.getElementById('high-score');
@@ -75,25 +84,9 @@ export class Game {
         this.input.onDragMove = (canvasX, canvasY) => {
             if (this.draggingBlockIndex < 0 || !this.draggingBlock) return;
 
-            const block = this.currentBlocks[this.draggingBlockIndex];
-            const gridPos = this.input.canvasToGrid(canvasX, canvasY);
-
-            // ゴースト位置を更新
-            const valid = this.board.canPlace(block.cells, gridPos.x, gridPos.y);
-            this.ghostPosition = { x: gridPos.x, y: gridPos.y, valid };
-
-            // 予測ハイライト: ここで配置したら消えるラインを計算
-            let clearingLines = null;
-            if (valid) {
-                clearingLines = this.board.getClearingLines(block.cells, gridPos.x, gridPos.y);
-            }
-            this.clearingLines = clearingLines; // 状態として保持
-
-            // ドラッグ中のスクリーン座標を更新
-            this.draggingBlock.screenX = canvasX - (block.bounds.width * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
-            this.draggingBlock.screenY = canvasY - (block.bounds.height * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
-
-            this.render();
+            // Just update pointer position, the loop handles the rest
+            this.dragState.pointerX = canvasX;
+            this.dragState.pointerY = canvasY;
         };
 
         this.input.onDragEnd = (gridX, gridY) => {
@@ -122,10 +115,30 @@ export class Game {
             this.init();
         });
 
+        // Settings UI
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                settingsOverlay.classList.remove('hidden');
+            });
+        }
+
+        if (closeSettingsBtn) {
+            closeSettingsBtn.addEventListener('click', () => {
+                settingsOverlay.classList.add('hidden');
+            });
+        }
+
         // リトライボタン（即座にリセット）
         const retryBtn = document.getElementById('retry-btn');
         retryBtn.addEventListener('click', () => {
-            this.init();
+            if (confirm('ゲームをリスタートしますか？')) {
+                this.init();
+                settingsOverlay.classList.add('hidden');
+            }
         });
 
         // サウンドトグルボタン
@@ -133,7 +146,12 @@ export class Game {
         soundBtn.addEventListener('click', () => {
             this.sound.init(); // 初回クリックでAudioContextを初期化
             const enabled = this.sound.toggle();
-            soundBtn.textContent = enabled ? '🔊' : '🔇';
+
+            // Update UI for complex button structure
+            const statusEl = soundBtn.querySelector('.status');
+            if (statusEl) {
+                statusEl.textContent = enabled ? 'ON' : 'OFF';
+            }
             soundBtn.classList.toggle('muted', !enabled);
         });
 
@@ -325,7 +343,23 @@ export class Game {
                 const startDrag = (e) => {
                     e.preventDefault();
                     if (this.gameState !== 'playing') return;
-                    this.startDrag(index);
+
+                    // Get coordinates
+                    let clientX, clientY;
+                    if (e.touches && e.touches.length > 0) {
+                        clientX = e.touches[0].clientX;
+                        clientY = e.touches[0].clientY;
+                    } else {
+                        clientX = e.clientX;
+                        clientY = e.clientY;
+                    }
+
+                    // Convert to canvas coords
+                    const rect = this.canvas.getBoundingClientRect();
+                    const canvasX = clientX - rect.left;
+                    const canvasY = clientY - rect.top;
+
+                    this.startDrag(index, canvasX, canvasY);
                 };
 
                 wrapper.addEventListener('touchstart', startDrag, { passive: false });
@@ -339,8 +373,10 @@ export class Game {
     /**
      * ドラッグ開始
      * @param {number} blockIndex 
+     * @param {number} startX Canvas X
+     * @param {number} startY Canvas Y
      */
-    startDrag(blockIndex) {
+    startDrag(blockIndex, startX, startY) {
         const block = this.currentBlocks[blockIndex];
         if (block.used) return;
 
@@ -353,12 +389,84 @@ export class Game {
             screenY: 0,
         };
 
+        // Initialize Drag State
+        this.dragState.isActive = true;
+        this.dragState.startTime = performance.now();
+        this.dragState.pointerX = startX;
+        this.dragState.pointerY = startY;
+        this.dragState.currentScale = 1.0;
+        this.dragState.currentOffsetY = 0;
+
         // 視覚的フィードバック: ドラッグ中のブロックをハイライト
         document.body.classList.add('is-dragging');
         const trayBlocks = this.blockTray.querySelectorAll('.tray-block');
         trayBlocks[blockIndex]?.classList.add('dragging');
 
         this.input.setDragging(true);
+
+        // Start Loop
+        this._dragLoop();
+    }
+
+    _dragLoop() {
+        if (!this.dragState.isActive) return;
+
+        const now = performance.now();
+        const elapsed = now - this.dragState.startTime;
+        const progress = Math.min(elapsed / CONFIG.PICKUP_DURATION, 1.0);
+
+        // Ease out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        this.dragState.currentOffsetY = CONFIG.DRAG_OFFSET_Y * ease;
+        this.dragState.currentScale = 1.0 + (CONFIG.DRAG_SCALE - 1.0) * ease;
+
+        // Apply Logic
+        this._updateDragLogic();
+
+        this.render();
+
+        if (this.dragState.isActive) {
+            requestAnimationFrame(this._dragLoop.bind(this));
+        }
+    }
+
+    _updateDragLogic() {
+        if (!this.draggingBlock) return;
+
+        const block = this.draggingBlock;
+
+        // Calculate Block Top-Left in Screen Coords
+        // Center of block is at (pointerX, pointerY + offset)
+        // Wait, normally we drag by the center? Or where we touched?
+        // Let's assume center dragging for simplicity as per previous code logic
+        // Previous logic: draggingBlock.screenX = canvasX - (width / 2)
+
+        const centerX = this.dragState.pointerX;
+        const centerY = this.dragState.pointerY + this.dragState.currentOffsetY;
+
+        // Visual Position (Top-Left)
+        block.screenX = centerX - (block.bounds.width * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
+        block.screenY = centerY - (block.bounds.height * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
+
+        // Grid Logic
+        // We want the block to snap based on its "Visual" position aka 'centerY'
+        // Input.canvasToGrid expects the touch position normally...
+        // But here we are offsetting the touch. 
+        // We should pass the "Effective Touch Position" (Where the block is)
+
+        const gridPos = this.input.canvasToGrid(centerX, centerY);
+
+        // ゴースト位置を更新
+        const valid = this.board.canPlace(block.cells, gridPos.x, gridPos.y);
+        this.ghostPosition = { x: gridPos.x, y: gridPos.y, valid };
+
+        // 予測ハイライト
+        let clearingLines = null;
+        if (valid) {
+            clearingLines = this.board.getClearingLines(block.cells, gridPos.x, gridPos.y);
+        }
+        this.clearingLines = clearingLines;
     }
 
     /**
@@ -375,6 +483,7 @@ export class Game {
         this.ghostPosition = null;
         this.clearingLines = null;
         this.input.setDragging(false);
+        this.dragState.isActive = false; // Stop loop
         this.render();
     }
 
@@ -387,7 +496,7 @@ export class Game {
     placeBlock(blockIndex, gridX, gridY) {
         const block = this.currentBlocks[blockIndex];
 
-        // 配置
+        // 1. Arrange: 配置と使用フラグ更新
         this.board.place(block.cells, gridX, gridY);
         block.used = true;
 
@@ -402,7 +511,7 @@ export class Game {
         const placementScore = CONFIG.SCORE.BASE_POINTS * block.cells.length;
         this.score += placementScore;
 
-        // ライン消去
+        // 2. Clear: ライン消去
         const clearResult = this.board.clearLines();
         const linesCleared = clearResult.totalCleared;
 
@@ -417,7 +526,7 @@ export class Game {
                 baseLineScore += linesCleared * CONFIG.SCORE.MULTI_LINE_BONUS;
             }
 
-            // コンボ倍率: 1 + (コンボ数 * 0.5) => 1.5, 2.0, 2.5...
+            // コンボ倍率
             const multiplier = 1 + (this.combo * CONFIG.SCORE.COMBO_MULTIPLIER);
 
             const totalActionScore = Math.floor(baseLineScore * multiplier);
@@ -426,14 +535,13 @@ export class Game {
             // ライン消去エフェクト
             this.playLineClearEffect(clearResult.rows, clearResult.cols);
 
-            // ヒットストップ & シェイク演出 (2ライン以上 or 3コンボ以上で強く)
+            // ヒットストップ & シェイク演出
             const magnitude = (linesCleared > 1 || this.combo > 2) ? 2 : 1;
             this.triggerHitStop(magnitude);
 
-            this.sound.playClear(); // 音はSoundManager側でコンボによって変化させる想定
+            this.sound.playClear();
             this.showCombo(this.combo);
         } else {
-            // ラインが消えなかったらコンボリセット
             this.combo = 0;
         }
 
@@ -449,18 +557,14 @@ export class Game {
             this.saveHighScore(this.highScore);
         }
 
-        // UI更新（スコアアニメーション付き）
-        this.updateUI(true);
-        this.renderBlockTray();
-
-        // 3つ使い切ったら新しいセットを生成
+        // 3. Refill: ブロック補充
         const allUsed = this.currentBlocks.every(b => b.used);
         if (allUsed) {
             this.blockGenerator.updateScore(this.score);
             const newBlocks = this.blockGenerator.generateBlockSet();
 
-            // ブロック生成できない場合はゲームオーバー
             if (!newBlocks) {
+                // 生成失敗（論理的な詰みなど）
                 this.gameState = 'gameover';
                 this.sound.playGameOver();
                 this.showGameOver();
@@ -469,10 +573,14 @@ export class Game {
             }
 
             this.currentBlocks = newBlocks;
-            this.renderBlockTray();
         }
 
-        // ゲームオーバー判定
+        // UI更新（スコアアニメーション付き）
+        this.updateUI(true);
+        this.renderBlockTray();
+
+        // 4. Game Over Check: 補充後の状態に基づいて判定
+        // 新しいブロック（あるいは残りのブロック）のうち、少なくとも1つが置けるか？
         this.checkGameOver();
 
         this.render();
@@ -612,6 +720,24 @@ export class Game {
         if (this.isHitStopped) return;
 
         this.renderer.draw(this.board, this.draggingBlock, this.ghostPosition, this.clearingLines);
+
+        // Pass scale if dragging
+        if (this.draggingBlock && this.dragState.isActive) {
+            // Re-draw dragging block with scale?
+            // actually renderer.draw calls drawDraggingBlock inside.
+            // We need to modify renderer.draw signature or modify how it calls drawDraggingBlock
+            // Let's modify Renderer.draw in a separate tool call as it's cleaner,
+            // OR I can just call drawDraggingBlock manually here? 
+            // No, layer order matters.
+
+            // Wait, I updated Renderer.js's drawDraggingBlock, but NOT Renderer.js's draw().
+            // Renderer.js's draw() calls `this.drawDraggingBlock(draggingBlock)`. 
+            // It doesn't pass scale.
+
+            // Force redraw of dragging block? No, I should have updated Renderer.draw to accept scale or read it from block.
+            // Since block is a plain object, I can attach scale to it!
+            this.draggingBlock.scale = this.dragState.currentScale;
+        }
     }
 
     /**

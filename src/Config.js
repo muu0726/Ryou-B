@@ -43,7 +43,10 @@ export const CONFIG = {
     },
 
     // Touch
-    TOUCH_OFFSET_Y: -100, // 指の上に大きく表示（ブロックブラスト風の距離感）
+    // Touch / Drag
+    DRAG_OFFSET_Y: -150, // Offset distance
+    DRAG_SCALE: 1.1,     // Scale when picking up
+    PICKUP_DURATION: 150, // Animation duration (ms)
 
     // Game
     BLOCKS_PER_SET: 3,
