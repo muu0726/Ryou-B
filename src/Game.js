@@ -95,14 +95,35 @@ export class Game {
                 return;
             }
 
-            const block = this.currentBlocks[this.draggingBlockIndex];
-
-            if (this.board.canPlace(block.cells, gridX, gridY)) {
-                this.placeBlock(this.draggingBlockIndex, gridX, gridY);
+            // Use the calculated ghost position (which accounts for offset and centering)
+            if (this.ghostPosition && this.ghostPosition.valid) {
+                this.placeBlock(this.draggingBlockIndex, this.ghostPosition.x, this.ghostPosition.y);
             }
 
             this.cancelDrag();
         };
+
+        this.input.onDragCancel = () => {
+            this.cancelDrag();
+        };
+    }
+
+    _setupUI() {
+        this.restartBtn.addEventListener('click', () => {
+            if (confirm('ゲームをリスタートしますか？')) {
+                this.gameOverOverlay.classList.add('hidden');
+                this.init();
+            }
+        });
+
+        // Settings UI
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        // ... (lines 123-447 are skipped for brevity in this replacement chunk, wait, replace_file_content requires contiguous block. I should split this if lines are far apart.
+        // Actually, _setupInputCallbacks is around line 83. _updateDragLogic is around line 434. They are far apart.
+        // I must use multi_replace_file_content.
+
 
         this.input.onDragCancel = () => {
             this.cancelDrag();
@@ -455,16 +476,25 @@ export class Game {
         // But here we are offsetting the touch. 
         // We should pass the "Effective Touch Position" (Where the block is)
 
+        // Grid Logic
+        // Calculate Grid Position based on Center, then shift to find Anchor (Top-Left)
+        // This ensures the block is centered under the finger (or offset point)
         const gridPos = this.input.canvasToGrid(centerX, centerY);
 
+        const shiftX = Math.floor(block.bounds.width / 2);
+        const shiftY = Math.floor(block.bounds.height / 2);
+
+        const anchorX = gridPos.x - shiftX;
+        const anchorY = gridPos.y - shiftY;
+
         // ゴースト位置を更新
-        const valid = this.board.canPlace(block.cells, gridPos.x, gridPos.y);
-        this.ghostPosition = { x: gridPos.x, y: gridPos.y, valid };
+        const valid = this.board.canPlace(block.cells, anchorX, anchorY);
+        this.ghostPosition = { x: anchorX, y: anchorY, valid };
 
         // 予測ハイライト
         let clearingLines = null;
         if (valid) {
-            clearingLines = this.board.getClearingLines(block.cells, gridPos.x, gridPos.y);
+            clearingLines = this.board.getClearingLines(block.cells, anchorX, anchorY);
         }
         this.clearingLines = clearingLines;
     }
