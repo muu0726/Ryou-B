@@ -1,0 +1,461 @@
+/**
+ * Game.js - メインゲームループと状態管理
+ */
+
+import { CONFIG } from './Config.js';
+import { Board } from './Board.js';
+import { BlockGenerator } from './BlockGenerator.js';
+import { Renderer } from './Renderer.js';
+import { InputHandler } from './Input.js';
+import { SoundManager } from './Sound.js';
+
+export class Game {
+    /**
+     * @param {HTMLCanvasElement} canvas 
+     * @param {HTMLImageElement} backgroundImage 
+     */
+    constructor(canvas, backgroundImage) {
+        this.canvas = canvas;
+        this.backgroundImage = backgroundImage;
+
+        // Core
+        this.board = new Board();
+        this.renderer = new Renderer(canvas, backgroundImage);
+        this.blockGenerator = new BlockGenerator(this.board);
+        this.input = new InputHandler(canvas, this.renderer);
+        this.sound = new SoundManager();
+
+        // State
+        this.score = 0;
+        this.highScore = this.loadHighScore();
+        this.combo = 0;
+        this.currentBlocks = [];
+        this.draggingBlockIndex = -1;
+        this.draggingBlock = null;
+        this.ghostPosition = null;
+        this.gameState = 'playing'; // 'playing', 'gameover'
+
+        // UI Elements
+        this.scoreEl = document.getElementById('score');
+        this.highScoreEl = document.getElementById('high-score');
+        this.comboDisplay = document.getElementById('combo-display');
+        this.comboCountEl = document.getElementById('combo-count');
+        this.gameOverOverlay = document.getElementById('game-over-overlay');
+        this.finalScoreEl = document.getElementById('final-score');
+        this.finalHighScoreEl = document.getElementById('final-high-score');
+        this.restartBtn = document.getElementById('restart-btn');
+        this.perfectOverlay = document.getElementById('perfect-overlay');
+        this.perfectImage = document.getElementById('perfect-image');
+        this.blockTray = document.getElementById('block-tray');
+
+        this._setupInputCallbacks();
+        this._setupUI();
+        this.init();
+    }
+
+    init() {
+        this.board.reset();
+        this.score = 0;
+        this.combo = 0;
+        this.gameState = 'playing';
+        this.currentBlocks = this.blockGenerator.generateBlockSet();
+        this.updateUI();
+        this.renderBlockTray();
+        this.render();
+    }
+
+    _setupInputCallbacks() {
+        this.input.onDragMove = (canvasX, canvasY) => {
+            if (this.draggingBlockIndex < 0 || !this.draggingBlock) return;
+
+            const block = this.currentBlocks[this.draggingBlockIndex];
+            const gridPos = this.input.canvasToGrid(canvasX, canvasY);
+
+            // ゴースト位置を更新
+            const valid = this.board.canPlace(block.cells, gridPos.x, gridPos.y);
+            this.ghostPosition = { x: gridPos.x, y: gridPos.y, valid };
+
+            // ドラッグ中のスクリーン座標を更新
+            this.draggingBlock.screenX = canvasX - (block.bounds.width * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
+            this.draggingBlock.screenY = canvasY - (block.bounds.height * (CONFIG.CELL_SIZE + CONFIG.GRID_GAP)) / 2;
+
+            this.render();
+        };
+
+        this.input.onDragEnd = (gridX, gridY) => {
+            if (this.draggingBlockIndex < 0 || !this.draggingBlock) {
+                this.cancelDrag();
+                return;
+            }
+
+            const block = this.currentBlocks[this.draggingBlockIndex];
+
+            if (this.board.canPlace(block.cells, gridX, gridY)) {
+                this.placeBlock(this.draggingBlockIndex, gridX, gridY);
+            }
+
+            this.cancelDrag();
+        };
+
+        this.input.onDragCancel = () => {
+            this.cancelDrag();
+        };
+    }
+
+    _setupUI() {
+        this.restartBtn.addEventListener('click', () => {
+            this.gameOverOverlay.classList.add('hidden');
+            this.init();
+        });
+
+        // リトライボタン（即座にリセット）
+        const retryBtn = document.getElementById('retry-btn');
+        retryBtn.addEventListener('click', () => {
+            this.init();
+        });
+
+        // サウンドトグルボタン
+        const soundBtn = document.getElementById('sound-btn');
+        soundBtn.addEventListener('click', () => {
+            this.sound.init(); // 初回クリックでAudioContextを初期化
+            const enabled = this.sound.toggle();
+            soundBtn.textContent = enabled ? '🔊' : '🔇';
+            soundBtn.classList.toggle('muted', !enabled);
+        });
+
+        // SNSシェアボタン
+        const shareBtn = document.getElementById('share-btn');
+        shareBtn.addEventListener('click', () => {
+            this.shareScore();
+        });
+
+        // ハイスコア表示
+        this.highScoreEl.textContent = this.highScore;
+    }
+
+    /**
+     * SNSシェア
+     */
+    shareScore() {
+        const text = `🎮 りょうたんブラストで ${this.score} 点を獲得！\n#りょうたんブラスト #BlockBlast`;
+        const url = window.location.href;
+
+        // Web Share APIが使える場合
+        if (navigator.share) {
+            navigator.share({ title: 'りょうたんブラスト', text, url })
+                .catch(() => this._openTwitterShare(text));
+        } else {
+            this._openTwitterShare(text);
+        }
+    }
+
+    _openTwitterShare(text) {
+        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+        window.open(tweetUrl, '_blank', 'width=550,height=420');
+    }
+
+    /**
+     * ブロックトレイをDOMにレンダリング
+     */
+    renderBlockTray() {
+        this.blockTray.innerHTML = '';
+
+        this.currentBlocks.forEach((block, index) => {
+            const wrapper = document.createElement('div');
+
+            // 配置可能かチェック
+            const canPlace = !block.used && this.board.canPlaceAnywhere(block.cells);
+
+            let className = 'tray-block';
+            if (block.used) className += ' used';
+            else if (!canPlace) className += ' disabled';
+
+            wrapper.className = className;
+            wrapper.dataset.index = index;
+
+            const thumbnail = this.renderer.createBlockThumbnail(block);
+            wrapper.appendChild(thumbnail);
+
+            if (!block.used && canPlace) {
+                // タッチ/マウスでドラッグ開始
+                const startDrag = (e) => {
+                    e.preventDefault();
+                    if (this.gameState !== 'playing') return;
+                    this.startDrag(index);
+                };
+
+                wrapper.addEventListener('touchstart', startDrag, { passive: false });
+                wrapper.addEventListener('mousedown', startDrag);
+            }
+
+            this.blockTray.appendChild(wrapper);
+        });
+    }
+
+    /**
+     * ドラッグ開始
+     * @param {number} blockIndex 
+     */
+    startDrag(blockIndex) {
+        const block = this.currentBlocks[blockIndex];
+        if (block.used) return;
+
+        this.draggingBlockIndex = blockIndex;
+        this.draggingBlock = {
+            cells: block.cells,
+            color: block.color,
+            bounds: block.bounds,
+            screenX: 0,
+            screenY: 0,
+        };
+
+        // 視覚的フィードバック: ドラッグ中のブロックをハイライト
+        document.body.classList.add('is-dragging');
+        const trayBlocks = this.blockTray.querySelectorAll('.tray-block');
+        trayBlocks[blockIndex]?.classList.add('dragging');
+
+        this.input.setDragging(true);
+    }
+
+    /**
+     * ドラッグキャンセル
+     */
+    cancelDrag() {
+        // ドラッグ状態の視覚的フィードバックを解除
+        document.body.classList.remove('is-dragging');
+        const trayBlocks = this.blockTray.querySelectorAll('.tray-block');
+        trayBlocks.forEach(el => el.classList.remove('dragging'));
+
+        this.draggingBlockIndex = -1;
+        this.draggingBlock = null;
+        this.ghostPosition = null;
+        this.input.setDragging(false);
+        this.render();
+    }
+
+    /**
+     * ブロックを配置
+     * @param {number} blockIndex 
+     * @param {number} gridX 
+     * @param {number} gridY 
+     */
+    placeBlock(blockIndex, gridX, gridY) {
+        const block = this.currentBlocks[blockIndex];
+
+        // 配置
+        this.board.place(block.cells, gridX, gridY);
+        block.used = true;
+
+        // 配置サウンド
+        this.sound.init();
+        this.sound.playPlace();
+
+        // 配置エフェクト
+        this.playPlacementEffect(block.cells, gridX, gridY);
+
+        // スコア加算 (配置分)
+        const placementScore = CONFIG.SCORE.BASE_POINTS * block.cells.length;
+        this.score += placementScore;
+
+        // ライン消去
+        const clearResult = this.board.clearLines();
+        const linesCleared = clearResult.totalCleared;
+
+        if (linesCleared > 0) {
+            this.combo++;
+            const lineBonus = CONFIG.SCORE.LINE_BONUS[Math.min(linesCleared, CONFIG.SCORE.LINE_BONUS.length - 1)];
+            const comboScore = Math.floor(lineBonus * Math.pow(this.combo, CONFIG.SCORE.COMBO_EXPONENT));
+            this.score += comboScore;
+
+            // ライン消去エフェクト
+            this.playLineClearEffect(clearResult.rows, clearResult.cols);
+            this.sound.playClear();
+            this.showCombo(this.combo);
+        } else {
+            this.combo = 0;
+        }
+
+        // パーフェクトクリアチェック
+        if (this.board.isEmpty()) {
+            this.score += CONFIG.SCORE.PERFECT_BONUS;
+            this.showPerfectClear();
+        }
+
+        // ハイスコア更新
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            this.saveHighScore(this.highScore);
+        }
+
+        // UI更新（スコアアニメーション付き）
+        this.updateUI(true);
+        this.renderBlockTray();
+
+        // 3つ使い切ったら新しいセットを生成
+        const allUsed = this.currentBlocks.every(b => b.used);
+        if (allUsed) {
+            this.blockGenerator.updateScore(this.score);
+            const newBlocks = this.blockGenerator.generateBlockSet();
+
+            // ブロック生成できない場合はゲームオーバー
+            if (!newBlocks) {
+                this.gameState = 'gameover';
+                this.sound.playGameOver();
+                this.showGameOver();
+                this.render();
+                return;
+            }
+
+            this.currentBlocks = newBlocks;
+            this.renderBlockTray();
+        }
+
+        // ゲームオーバー判定
+        this.checkGameOver();
+
+        this.render();
+    }
+
+    /**
+     * 配置エフェクトを再生
+     */
+    playPlacementEffect(cells, gridX, gridY) {
+        const duration = 200;
+        const startTime = performance.now();
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            this.render();
+            this.renderer.drawPlacementEffect(cells, gridX, gridY, progress);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }
+
+    /**
+     * ライン消去エフェクトを再生
+     */
+    playLineClearEffect(rows, cols) {
+        if (rows.length === 0 && cols.length === 0) return;
+
+        const duration = 300;
+        const startTime = performance.now();
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            this.render();
+            this.renderer.drawLineClearEffect(rows, cols, progress);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }
+
+    /**
+     * ゲームオーバー判定
+     */
+    checkGameOver() {
+        // 残っているブロックがどれも配置できなければゲームオーバー
+        const availableBlocks = this.currentBlocks.filter(b => !b.used);
+
+        for (const block of availableBlocks) {
+            if (this.board.canPlaceAnywhere(block.cells)) {
+                return; // 置ける場所がある
+            }
+        }
+
+        // ゲームオーバー
+        this.gameState = 'gameover';
+        this.sound.playGameOver();
+        this.showGameOver();
+    }
+
+    /**
+     * ゲームオーバー画面を表示
+     */
+    showGameOver() {
+        this.finalScoreEl.textContent = this.score;
+        this.finalHighScoreEl.textContent = this.highScore;
+        this.gameOverOverlay.classList.remove('hidden');
+    }
+
+    /**
+     * コンボ表示
+     * @param {number} count 
+     */
+    showCombo(count) {
+        this.comboCountEl.textContent = count;
+        this.comboDisplay.classList.remove('hidden');
+        this.comboDisplay.classList.add('show');
+        this.sound.playCombo(count);
+
+        setTimeout(() => {
+            this.comboDisplay.classList.remove('show');
+        }, CONFIG.COMBO_DISPLAY_DURATION);
+    }
+
+    /**
+     * パーフェクトクリア演出
+     */
+    showPerfectClear() {
+        this.perfectImage.src = this.renderer.getFullImageDataUrl();
+        this.perfectOverlay.classList.remove('hidden');
+        this.sound.playPerfect();
+
+        setTimeout(() => {
+            this.perfectOverlay.classList.add('hidden');
+        }, CONFIG.PERFECT_DISPLAY_DURATION);
+    }
+
+    /**
+     * UI更新
+     * @param {boolean} animate - スコアアニメーションを再生するか
+     */
+    updateUI(animate = false) {
+        this.scoreEl.textContent = this.score;
+        this.highScoreEl.textContent = this.highScore;
+
+        // スコアポップアニメーション
+        if (animate) {
+            this.scoreEl.classList.remove('score-pop');
+            // 強制リフロー
+            void this.scoreEl.offsetWidth;
+            this.scoreEl.classList.add('score-pop');
+        }
+    }
+
+    /**
+     * 描画
+     */
+    render() {
+        this.renderer.draw(this.board, this.draggingBlock, this.ghostPosition);
+    }
+
+    /**
+     * ハイスコア読み込み
+     * @returns {number}
+     */
+    loadHighScore() {
+        const saved = localStorage.getItem('ryoutan-blast-highscore');
+        return saved ? parseInt(saved, 10) : 0;
+    }
+
+    /**
+     * ハイスコア保存
+     * @param {number} score 
+     */
+    saveHighScore(score) {
+        localStorage.setItem('ryoutan-blast-highscore', score.toString());
+    }
+}

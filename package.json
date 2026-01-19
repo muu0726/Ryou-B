@@ -1,0 +1,21 @@
+{
+    "name": "ryoutan-blast",
+    "version": "1.0.0",
+    "description": "Block Blast style puzzle game with hidden image reveal mechanics",
+    "main": "main.js",
+    "scripts": {
+        "start": "npx serve ."
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/muu0726/Ryou-B.git"
+    },
+    "keywords": [
+        "game",
+        "puzzle",
+        "canvas",
+        "javascript"
+    ],
+    "author": "",
+    "license": "MIT"
+}

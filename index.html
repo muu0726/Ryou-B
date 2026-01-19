@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="りょうたんブラスト - Block Blast風パズルゲーム">
+    <meta name="theme-color" content="#ff6b6b">
+
+    <!-- Security: Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        connect-src 'self';
+        font-src 'self';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+    ">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
+    <title>りょうたんブラスト</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <header id="header">
+            <div class="score-display">
+                <span class="label">SCORE</span>
+                <span id="score">0</span>
+            </div>
+            <div class="header-buttons">
+                <button id="sound-btn" title="サウンド">🔊</button>
+                <button id="retry-btn" title="リトライ">🔄</button>
+            </div>
+            <div class="score-display">
+                <span class="label">BEST</span>
+                <span id="high-score">0</span>
+            </div>
+        </header>
+
+        <main id="main-area">
+            <canvas id="game-canvas"></canvas>
+        </main>
+
+        <footer id="block-tray">
+            <!-- 3つのブロック候補がここに表示される -->
+        </footer>
+
+        <div id="combo-display" class="hidden">
+            <span id="combo-count">0</span>
+            <span class="combo-label">COMBO</span>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1>GAME OVER</h1>
+            <p>SCORE: <span id="final-score">0</span></p>
+            <p>BEST: <span id="final-high-score">0</span></p>
+            <div class="overlay-buttons">
+                <button id="restart-btn">もう一度プレイ</button>
+                <button id="share-btn">📤 シェア</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perfect Clear Overlay -->
+    <div id="perfect-overlay" class="overlay hidden">
+        <img id="perfect-image" src="" alt="Perfect!">
+        <div class="perfect-text">PERFECT!</div>
+    </div>
+
+    <!-- Cache busting -->
+    <script type="module" src="main.js?v=3"></script>
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
+                    registration.unregister(); // Force unregister to clear old cache
+                }
+            });
+
+            // Re-register
+            navigator.serviceWorker.register('/sw.js?v=3')
+                .then(() => console.log('Service Worker registered (v3)'))
+                .catch(err => console.warn('Service Worker registration failed:', err));
+        }
+    </script>
+</body>
+
+</html>
