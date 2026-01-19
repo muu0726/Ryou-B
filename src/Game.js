@@ -187,7 +187,6 @@ export class Game {
 
         // リトライボタン（即座にリセット）
         const retryBtn = document.getElementById('retry-btn');
-        const retryBtn = document.getElementById('retry-btn');
         this._addButtonListener(retryBtn, () => {
             if (confirm('ゲームをリスタートしますか？')) {
                 this.init();
@@ -231,7 +230,6 @@ export class Game {
 
         // サウンドトグルボタン
         const soundBtn = document.getElementById('sound-btn');
-        const soundBtn = document.getElementById('sound-btn');
         this._addButtonListener(soundBtn, () => {
             this.sound.init(); // 初回クリックでAudioContextを初期化
             const enabled = this.sound.toggle();
@@ -245,7 +243,6 @@ export class Game {
         });
 
         // SNSシェアボタン
-        const shareBtn = document.getElementById('share-btn');
         const shareBtn = document.getElementById('share-btn');
         this._addButtonListener(shareBtn, () => {
             this.shareScore();
