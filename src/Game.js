@@ -95,9 +95,26 @@ export class Game {
                 return;
             }
 
-            // Use the calculated ghost position (which accounts for offset and centering)
-            if (this.ghostPosition && this.ghostPosition.valid) {
-                this.placeBlock(this.draggingBlockIndex, this.ghostPosition.x, this.ghostPosition.y);
+            // Sync placement exactly with the visual block position
+            // Use currentOffsetY (which might be animating) rather than static CONFIG offset
+            const centerX = this.dragState.pointerX;
+            const centerY = this.dragState.pointerY + this.dragState.currentOffsetY;
+
+            // Grid Logic (Match _updateDragLogic)
+            const finalGridPos = this.input.canvasToGrid(centerX, centerY);
+
+            const block = this.draggingBlock;
+            const shiftX = Math.floor(block.bounds.width / 2);
+            const shiftY = Math.floor(block.bounds.height / 2);
+
+            const anchorX = finalGridPos.x - shiftX;
+            const anchorY = finalGridPos.y - shiftY;
+
+            // Check validity directly
+            const valid = this.board.canPlace(block.cells, anchorX, anchorY);
+
+            if (valid) {
+                this.placeBlock(this.draggingBlockIndex, anchorX, anchorY);
             }
 
             this.cancelDrag();

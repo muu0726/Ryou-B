@@ -46,7 +46,7 @@ export const CONFIG = {
     // Touch / Drag
     DRAG_OFFSET_Y: -150, // Offset distance
     DRAG_SCALE: 1.1,     // Scale when picking up
-    PICKUP_DURATION: 150, // Animation duration (ms)
+    PICKUP_DURATION: 50, // Animation duration (ms)
 
     // Game
     BLOCKS_PER_SET: 3,
