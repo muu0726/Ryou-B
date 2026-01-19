@@ -199,6 +199,11 @@ body.is-dragging .tray-block:not(.dragging):not(.used):not(.disabled) {
     transition: opacity 0.5s ease;
 }
 
+#leaderboard-overlay {
+    z-index: 1010;
+    /* Ensure this is above Game Over overlay which is 1000 */
+}
+
 .overlay.hidden {
     opacity: 0;
     pointer-events: none;
