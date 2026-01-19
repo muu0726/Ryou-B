@@ -60,6 +60,11 @@ export class Game {
         this.score = 0;
         this.combo = 0;
         this.gameState = 'playing';
+
+        // UI Cleanups
+        if (this.leaderboardOverlay) this.leaderboardOverlay.classList.add('hidden');
+        if (this.gameOverOverlay) this.gameOverOverlay.classList.add('hidden');
+
         this.currentBlocks = this.blockGenerator.generateBlockSet();
         this.updateUI();
         this.renderBlockTray();
@@ -231,6 +236,12 @@ export class Game {
     async submitScore() {
         const name = this.playerNameInput.value.trim();
         if (!name) return;
+
+        // スコア0以下の場合は送信しない
+        if (this.score <= 0) {
+            alert('スコアが0のため登録できません。');
+            return;
+        }
 
         // 名前を保存
         localStorage.setItem('ryoutan-blast-username', name);

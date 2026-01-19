@@ -66,13 +66,27 @@ export const SHAPES = {
         { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 },
         { x: 1, y: 1 }, { x: 1, y: 2 }
     ],
+    // === 矩形 (2x3, 3x2) ===
+    RECT_3x2: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }
+    ],
+    RECT_2x3: [
+        { x: 0, y: 0 }, { x: 1, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }
+    ],
 };
 
 // 難易度別の形状グループ (DOTは除外 - ゲームオーバー回避が容易になりすぎるため)
 export const SHAPE_POOLS = {
-    EASY: ['H2', 'V2', 'H3', 'V3', 'L3_1', 'L3_2', 'L3_3', 'L3_4', 'SQUARE'],
-    MEDIUM: ['H3', 'V3', 'L3_1', 'L3_2', 'L3_3', 'L3_4', 'SQUARE', 'H4', 'V4', 'T', 'T_UP', 'T_LEFT', 'T_RIGHT', 'S', 'Z', 'S_V', 'Z_V', 'L4_1', 'L4_2', 'L4_3', 'L4_4', 'L4_5', 'L4_6', 'L4_7', 'L4_8'],
-    HARD: ['H4', 'V4', 'H5', 'V5', 'PLUS', 'SQUARE3', 'BIG_L', 'BIG_T'],
+    // 最初から大きいブロックも出るように修正
+    EASY: [
+        'H2', 'V2', 'H3', 'V3', 'L3_1', 'L3_2', 'L3_3', 'L3_4', 'SQUARE',
+        'RECT_3x2', 'RECT_2x3', 'SQUARE3', 'BIG_L', 'BIG_T'
+    ],
+    MEDIUM: ['H3', 'V3', 'L3_1', 'L3_2', 'L3_3', 'L3_4', 'SQUARE', 'H4', 'V4', 'T', 'T_UP', 'T_LEFT', 'T_RIGHT', 'S', 'Z', 'S_V', 'Z_V', 'L4_1', 'L4_2', 'L4_3', 'L4_4', 'L4_5', 'L4_6', 'L4_7', 'L4_8', 'RECT_3x2', 'RECT_2x3', 'SQUARE3'],
+    HARD: ['H4', 'V4', 'H5', 'V5', 'PLUS', 'SQUARE3', 'BIG_L', 'BIG_T', 'RECT_3x2', 'RECT_2x3'],
 };
 
 /**

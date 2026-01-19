@@ -104,7 +104,7 @@
     </div>
 
     <!-- Cache busting -->
-    <script type="module" src="main.js?v=3"></script>
+    <script type="module" src="main.js?v=4"></script>
     <script>
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
@@ -115,7 +115,7 @@
             });
 
             // Re-register
-            navigator.serviceWorker.register('/sw.js?v=3')
+            navigator.serviceWorker.register('/sw.js?v=4')
                 .then(() => console.log('Service Worker registered (v3)'))
                 .catch(err => console.warn('Service Worker registration failed:', err));
         }
