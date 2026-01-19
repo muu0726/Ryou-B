@@ -7,12 +7,11 @@
   "orientation": "portrait",
   "background_color": "#0a0a0a",
   "theme_color": "#ff6b6b",
-  "icons": [
-    {
-      "src": "favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  {
+    "src": "assets/background.jpg",
+    "sizes": "192x192 512x512",
+    "type": "image/jpeg",
+    "purpose": "any maskable"
+  }
+]
 }

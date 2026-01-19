@@ -179,6 +179,40 @@ export class Game {
             }
         });
 
+        // PWA Install Button
+        const installBtn = document.getElementById('install-btn');
+        this.deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            this.deferredPrompt = e;
+            // Update UI to notify the user they can add to home screen
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', () => {
+                if (this.deferredPrompt) {
+                    // Show the prompt
+                    this.deferredPrompt.prompt();
+                    // Wait for the user to respond to the prompt
+                    this.deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted the A2HS prompt');
+                        } else {
+                            console.log('User dismissed the A2HS prompt');
+                        }
+                        this.deferredPrompt = null;
+                        installBtn.classList.add('hidden'); // Hide after use
+                    });
+                }
+            });
+        }
+
         // サウンドトグルボタン
         const soundBtn = document.getElementById('sound-btn');
         soundBtn.addEventListener('click', () => {
