@@ -125,8 +125,23 @@ export class Game {
         };
     }
 
+    _addButtonListener(element, callback) {
+        if (!element) return;
+        const handler = (e) => {
+            e.preventDefault(); // Stop double firing and default touch actions
+            callback(e);
+        };
+        element.addEventListener('touchstart', handler, { passive: false });
+        element.addEventListener('click', (e) => {
+            // If it was a touch event, preventDefault in touchstart stops click.
+            // So this only fires on actual mouse clicks or if preventDefault wasn't called.
+            callback(e);
+        });
+    }
+
     _setupUI() {
-        this.restartBtn.addEventListener('click', () => {
+        this._addButtonListener(this.restartBtn, () => {
+
             if (confirm('ゲームをリスタートしますか？')) {
                 this.gameOverOverlay.classList.add('hidden');
                 this.init();
@@ -159,20 +174,21 @@ export class Game {
         const closeSettingsBtn = document.getElementById('close-settings-btn');
 
         if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => {
+            this._addButtonListener(settingsBtn, () => {
                 settingsOverlay.classList.remove('hidden');
             });
         }
 
         if (closeSettingsBtn) {
-            closeSettingsBtn.addEventListener('click', () => {
+            this._addButtonListener(closeSettingsBtn, () => {
                 settingsOverlay.classList.add('hidden');
             });
         }
 
         // リトライボタン（即座にリセット）
         const retryBtn = document.getElementById('retry-btn');
-        retryBtn.addEventListener('click', () => {
+        const retryBtn = document.getElementById('retry-btn');
+        this._addButtonListener(retryBtn, () => {
             if (confirm('ゲームをリスタートしますか？')) {
                 this.init();
                 settingsOverlay.classList.add('hidden');
@@ -215,7 +231,8 @@ export class Game {
 
         // サウンドトグルボタン
         const soundBtn = document.getElementById('sound-btn');
-        soundBtn.addEventListener('click', () => {
+        const soundBtn = document.getElementById('sound-btn');
+        this._addButtonListener(soundBtn, () => {
             this.sound.init(); // 初回クリックでAudioContextを初期化
             const enabled = this.sound.toggle();
 
@@ -229,7 +246,8 @@ export class Game {
 
         // SNSシェアボタン
         const shareBtn = document.getElementById('share-btn');
-        shareBtn.addEventListener('click', () => {
+        const shareBtn = document.getElementById('share-btn');
+        this._addButtonListener(shareBtn, () => {
             this.shareScore();
         });
 
@@ -253,24 +271,26 @@ export class Game {
         this.headerRankingBtn = document.getElementById('header-ranking-btn');
 
         // イベントリスナー
-        this.showLeaderboardBtn.addEventListener('click', () => {
+        this._addButtonListener(this.showLeaderboardBtn, () => {
+            console.log('Ranking Button Clicked! State:', this.gameState, 'Score:', this.score);
             // ゲームオーバー時は登録フォームを表示
             const showInput = (this.gameState === 'gameover' && this.score > 0);
+            console.log('Show Input Condition:', showInput);
             this.showLeaderboard(showInput);
         });
 
         // プレイ画面のランキングボタン（閲覧のみ）
         if (this.headerRankingBtn) {
-            this.headerRankingBtn.addEventListener('click', () => {
+            this._addButtonListener(this.headerRankingBtn, () => {
                 this.showLeaderboard(false);
             });
         }
 
-        this.closeLeaderboardBtn.addEventListener('click', () => {
+        this._addButtonListener(this.closeLeaderboardBtn, () => {
             this.leaderboardOverlay.classList.add('hidden');
         });
 
-        this.submitScoreBtn.addEventListener('click', () => {
+        this._addButtonListener(this.submitScoreBtn, () => {
             this.submitScore();
         });
     }
@@ -286,6 +306,11 @@ export class Game {
             // 保存された名前があれば入力済みにしておく
             const savedName = localStorage.getItem('ryoutan-blast-username');
             if (savedName) this.playerNameInput.value = savedName;
+
+            // Focus with delay to handle mobile keyboard
+            setTimeout(() => {
+                this.playerNameInput.focus();
+            }, 300);
         } else {
             this.submitScoreArea.classList.add('hidden');
             this.myScoreDisplay.textContent = '';
